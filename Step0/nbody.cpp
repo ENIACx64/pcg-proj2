@@ -32,17 +32,23 @@ constexpr float COLLISION_DISTANCE = 0.01f;
  * @brief Constructor
  * @param N - Number of particles
  */
-Particles::Particles(const unsigned N)
+Particles::Particles(const unsigned N) : N(N)
 {
+  positions = new float4[N]();
+  velocities = new float3[N]();
 
+  #pragma acc enter data copyin(this[0:1])
+  #pragma acc enter data create(positions[0:N], velocities[0:N])
 }
 
 /// @brief Destructor
 Particles::~Particles()
 {
+  #pragma acc exit data delete(positions[0:N], velocities[0:N])
+  #pragma acc exit data delete(this[0:1])
 
-
-
+  delete[] positions;
+  delete[] velocities;
 }
 
 /**
@@ -50,9 +56,7 @@ Particles::~Particles()
  */
 void Particles::copyToDevice()
 {
-
-
-
+  #pragma acc update device(positions[0:N], velocities[0:N])
 }
 
 /**
@@ -60,9 +64,7 @@ void Particles::copyToDevice()
  */
 void Particles::copyToHost()
 {
-
-
-
+  #pragma acc update host(positions[0:N], velocities[0:N])
 }
 
 /**
@@ -71,17 +73,19 @@ void Particles::copyToHost()
  */
 Velocities::Velocities(const unsigned N)
 {
+  velocities = new float3[N]();
 
-
-
+  #pragma acc enter data copyin(this[0:1])
+  #pragma acc enter data create(velocities[0:N])
 }
 
 /// @brief Destructor
 Velocities::~Velocities()
 {
+  #pragma acc exit data delete(velocities[0:N])
+  #pragma acc exit data delete(this[0:1])
 
-
-
+  delete[] velocities;
 }
 
 /**
@@ -89,9 +93,7 @@ Velocities::~Velocities()
  */
 void Velocities::copyToDevice()
 {
-
-
-
+  #pragma acc update device(velocities[0:N])
 }
 
 /**
@@ -99,9 +101,7 @@ void Velocities::copyToDevice()
  */
 void Velocities::copyToHost()
 {
-
-
-
+  #pragma acc update host(velocities[0:N])
 }
 
 /**********************************************************************************************************************/
@@ -120,7 +120,7 @@ void calculateGravitationVelocity(Particles& p, Velocities& tmpVel, const unsign
   /*                            you can use overloaded operators defined in Vec.h                                     */
   /********************************************************************************************************************/
 
-
+  
 
   /********************************************************************************************************************/
 }// end of calculateGravitationVelocity

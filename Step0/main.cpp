@@ -66,13 +66,13 @@ int main(int argc, char **argv)
    *         Data pointer   consecutive elements    element in FLOATS
    *                        in FLOATS (not bytes)   (not bytes)
    */
-  MemDesc md(nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
+  MemDesc md(&particles.positions[0].x, 4, 0,
+             &particles.positions[0].y, 4, 0,
+             &particles.positions[0].z, 4, 0,
+             &particles.velocities[0].x, 3, 0,
+             &particles.velocities[0].y, 3, 0,
+             &particles.velocities[0].z, 3, 0,
+             &particles.positions[0].w, 4, 0,
              N,
              recordsCount);
 
