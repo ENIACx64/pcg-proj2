@@ -247,8 +247,27 @@ void updateParticles(Particles& p, Velocities& tmpVel, const unsigned N, float d
   /*                    TODO: Update particles position and velocity, see reference CPU version,                      */
   /*                            you can use overloaded operators defined in Vec.h                                     */
   /********************************************************************************************************************/
+  #pragma acc parallel loop gang vector present(p, tmpVel)
+  for (int i = 0; i < N; i++)
+  {
+    const float4 posOld = p.positions[i];
+    float4 posNew;
+    const float3 velOld = p.velocities[i];
+    float3 velNew;
+    const float3 velTmp = tmpVel.velocities[i];
 
+    velNew.x = velOld.x + velTmp.x;
+    velNew.y = velOld.y + velTmp.y;
+    velNew.z = velOld.z + velTmp.z;
 
+    posNew.x = posOld.x + velNew.x * dt;
+    posNew.y = posOld.y + velNew.y * dt;
+    posNew.z = posOld.z + velNew.z * dt;
+    posNew.w = posOld.w;
+
+    p.positions[i] = posNew;
+    p.velocities[i] = velNew;
+  }
 
   /********************************************************************************************************************/
 }// end of updateParticles
