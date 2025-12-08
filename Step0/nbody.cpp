@@ -119,9 +119,50 @@ void calculateGravitationVelocity(Particles& p, Velocities& tmpVel, const unsign
   /*                    TODO: Calculate gravitation velocity, see reference CPU version,                              */
   /*                            you can use overloaded operators defined in Vec.h                                     */
   /********************************************************************************************************************/
+  #pragma acc parallel loop present(p, tmpVel)
+  for (int i = 0; i < N; i++)
+  {
+    float newVelX = 0.0f;
+    float newVelY = 0.0f;
+    float newVelZ = 0.0f;
 
-  
+    const float4 posi = p.positions[i];
+    const float wi = posi.w;
 
+    #pragma acc loop seq
+    for (int j = 0; j < N; j++)
+    {
+      // checking if particle interacts with itself
+      if (i == j) continue;
+
+      const float4 posj = p.positions[j];
+      const float wj = posj.w;
+
+      // calculating position differences
+      float dx = posj.x - posi.x;
+      float dy = posj.y - posi.y;
+      float dz = posj.z - posi.z;
+
+      // calculating r as shown in the CPU version
+      float r2 = dx * dx + dy * dy + dz * dz;
+      float r  = std::sqrt(r2);
+
+      // calculating gravitation velocity
+      if (r > COLLISION_DISTANCE)
+      {
+        const float f = G * wi * wj / r2;
+        const float ir = 1.0f / r;
+
+        newVelX += f * dx * ir;
+        newVelY += f * dy * ir;
+        newVelZ += f * dz * ir;
+      }
+    }
+
+    tmpVel.velocities[i].x = newVelX * dt / wi;
+    tmpVel.velocities[i].y = newVelY * dt / wi;
+    tmpVel.velocities[i].z = newVelZ * dt / wi;
+  }
   /********************************************************************************************************************/
 }// end of calculateGravitationVelocity
 //----------------------------------------------------------------------------------------------------------------------
@@ -139,8 +180,55 @@ void calculateCollisionVelocity(Particles& p, Velocities& tmpVel, const unsigned
   /*                    TODO: Calculate collision velocity, see reference CPU version,                                */
   /*                            you can use overloaded operators defined in Vec.h                                     */
   /********************************************************************************************************************/
+  #pragma acc parallel loop gang vector present(p, tmpVel)
+  for (int i = 0; i < N; i++)
+  {
+    float newVelX = 0.0f;
+    float newVelY = 0.0f;
+    float newVelZ = 0.0f;
 
+    const float4 posi = p.positions[i];
+    const float3 veli = p.velocities[i];
+    const float wi = posi.w;
 
+    #pragma acc loop seq
+    for (int j = 0; j < N; j++)
+    {
+      // checking if particle interacts with itself
+      if (i == j) continue;
+
+      const float4 posj = p.positions[j];
+      const float3 velj = p.velocities[j];
+      const float wj = posj.w;
+
+      // calculating position differences
+      float dx = posj.x - posi.x;
+      float dy = posj.y - posi.y;
+      float dz = posj.z - posi.z;
+
+      // calculating r as shown in the CPU version
+      float r2 = dx * dx + dy * dy + dz * dz;
+      float r  = std::sqrt(r2);
+
+      // calculating collision velocity
+      if (r < COLLISION_DISTANCE)
+      {
+        const float im = 1.0f / (wi + wj);
+
+        const float vx = (wi * veli.x - wj * veli.x + 2.0f * wj * velj.x) * im;
+        const float vy = (wi * veli.y - wj * veli.y + 2.0f * wj * velj.y) * im;
+        const float vz = (wi * veli.z - wj * veli.z + 2.0f * wj * velj.z) * im;
+
+        newVelX = vx - veli.x;
+        newVelY = vy - veli.y;
+        newVelZ = vz - veli.z;
+      }
+    }
+
+    tmpVel.velocities[i].x += newVelX;
+    tmpVel.velocities[i].y += newVelY;
+    tmpVel.velocities[i].z += newVelZ;
+  }
 
   /********************************************************************************************************************/
 }// end of calculateCollisionVelocity
