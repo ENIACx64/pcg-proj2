@@ -1,5 +1,5 @@
 /**
- * @file      nbody.h
+ * @file      main.cpp
  *
  * @author    Jindrich Vodak \n
  *            Faculty of Information Technology \n

@@ -1,5 +1,5 @@
 /**
- * @file      nbody.h
+ * @file      nbody.cpp
  *
  * @author    Jindrich Vodak \n
  *            Faculty of Information Technology \n
@@ -71,7 +71,7 @@ void Particles::copyToHost()
  * @brief Constructor
  * @param N - Number of particles
  */
-Velocities::Velocities(const unsigned N)
+Velocities::Velocities(const unsigned N) : N(N)
 {
   velocities = new float3[N]();
 
