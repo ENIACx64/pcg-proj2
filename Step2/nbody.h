@@ -1,10 +1,10 @@
 /**
  * @file      nbody.h
  *
- * @author    Name Surname \n
+ * @author    Jindrich Vodak \n
  *            Faculty of Information Technology \n
  *            Brno University of Technology \n
- *            xlogin00@fit.vutbr.cz
+ *            xvodak06@stud.fit.vutbr.cz
  *
  * @brief     PCG - Assignment 2 / Step2
  *
@@ -61,9 +61,10 @@ struct Particles
   /********************************************************************************************************************/
   /* TODO: Particles data structure optimized for use on GPU. Use float3 and float4 structures defined in file Vec.h  */
   /********************************************************************************************************************/
-
-
-
+  unsigned N;
+  float4* positions;
+  float3* velocities;
+  
   /********************************************************************************************************************/
 };
 

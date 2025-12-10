@@ -1,10 +1,10 @@
 /**
  * @file      nbody.cpp
  *
- * @author    Name Surname \n
+ * @author    Jindrich Vodak \n
  *            Faculty of Information Technology \n
  *            Brno University of Technology \n
- *            xlogin00@fit.vutbr.cz
+ *            xvodak06@stud.fit.vutbr.cz
  *
  * @brief     PCG - Assignment 2 / Step2
  *
@@ -32,19 +32,24 @@ constexpr float COLLISION_DISTANCE = 0.01f;
  * @brief Constructor
  * @param N - Number of particles
  */
-Particles::Particles(const unsigned N)
+Particles::Particles(const unsigned N) : N(N)
 {
+  positions = new float4[N]();
+  velocities = new float3[N]();
 
-
-
+  #pragma acc enter data copyin(this[0:1])
+  #pragma acc enter data create(positions[0:N], velocities[0:N])
 }
+
 
 /// @brief Destructor
 Particles::~Particles()
 {
+  #pragma acc exit data delete(positions[0:N], velocities[0:N])
+  #pragma acc exit data delete(this[0:1])
 
-
-
+  delete[] positions;
+  delete[] velocities;
 }
 
 /**
@@ -52,9 +57,7 @@ Particles::~Particles()
  */
 void Particles::copyToDevice()
 {
-
-
-
+  #pragma acc update device(positions[0:N], velocities[0:N])
 }
 
 /**
@@ -62,9 +65,7 @@ void Particles::copyToDevice()
  */
 void Particles::copyToHost()
 {
-
-
-
+  #pragma acc update host(positions[0:N], velocities[0:N])
 }
 
 /**********************************************************************************************************************/
@@ -82,8 +83,80 @@ void calculateVelocity(Particles& pIn, Particles& pOut, const unsigned N, float 
   /*             TODO: Calculate gravitation velocity and position, see reference CPU version,                        */
   /*                            you can use overloaded operators defined in Vec.h                                     */
   /********************************************************************************************************************/
+  #pragma acc parallel loop gang vector present(pIn, pOut)
+  for (int i = 0; i < N; i++)
+  {
+    const float4 posi = pIn.positions[i];
+    const float3 veli = pIn.velocities[i];
+    const float wi = posi.w;
 
+    float newVelX = 0.0f;
+    float newVelY = 0.0f;
+    float newVelZ = 0.0f;
+    float collisionVelX = 0.0f;
+    float collisionVelY = 0.0f;
+    float collisionVelZ = 0.0f;
 
+    #pragma acc loop seq
+    for (int j = 0; j < N; j++)
+    {
+      // checking if particle interacts with itself
+      if (i == j) continue;
+
+      const float4 posj = pIn.positions[j];
+      const float wj = posj.w;
+      const float3 velj = pIn.velocities[j];
+
+      // calculating position differences
+      float dx = posj.x - posi.x;
+      float dy = posj.y - posi.y;
+      float dz = posj.z - posi.z;
+
+       // calculating r as shown in the CPU version
+      float r2 = dx * dx + dy * dy + dz * dz;
+      float r  = std::sqrt(r2);
+
+      // calculating gravitation velocity
+      if (r > COLLISION_DISTANCE)
+      {
+        const float f = G * wi * wj / r2;
+        const float ir = 1.0f / r;
+
+        newVelX += f * dx * ir;
+        newVelY += f * dy * ir;
+        newVelZ += f * dz * ir;
+      }
+
+      // calculating collision velocity
+      if (r < COLLISION_DISTANCE)
+      {
+        const float im = 1.0f / (wi + wj);
+
+        const float vx = (wi * veli.x - wj * veli.x + 2.0f * wj * velj.x) * im;
+        const float vy = (wi * veli.y - wj * veli.y + 2.0f * wj * velj.y) * im;
+        const float vz = (wi * veli.z - wj * veli.z + 2.0f * wj * velj.z) * im;
+
+        collisionVelX = vx - veli.x;
+        collisionVelY = vy - veli.y;
+        collisionVelZ = vz - veli.z;
+      }
+    }
+
+    float4 posNew;
+    float3 velNew;
+
+    velNew.x = veli.x + newVelX * (dt / wi) + collisionVelX;
+    velNew.y = veli.y + newVelY * (dt / wi) + collisionVelY;
+    velNew.z = veli.z + newVelZ * (dt / wi) + collisionVelZ;
+
+    posNew.x = posi.x + velNew.x * dt;
+    posNew.y = posi.y + velNew.y * dt;
+    posNew.z = posi.z + velNew.z * dt;
+    posNew.w = wi;
+
+    pOut.positions[i] = posNew;
+    pOut.velocities[i] = velNew;
+  }
 
   /********************************************************************************************************************/
 }// end of calculateVelocity
@@ -100,8 +173,41 @@ void centerOfMass(Particles& p, float4* comBuff, const unsigned N)
   /********************************************************************************************************************/
   /*                                    TODO: Calculate particles center of mass                                      */
   /********************************************************************************************************************/
+  // rounding to the closest power of two (for division)
+  unsigned maxN = 1;
+  while (maxN < N) maxN <<= 1;
+  float4 zero = {0.0f, 0.0f, 0.0f, 0.0f};
 
+  #pragma acc parallel loop gang present(p, comBuff)
+  for (int i = 0; i < maxN; i++)
+  {
+    if (i < N) comBuff[i] = p.positions[i];
+    else comBuff[i] = zero;
+  }
 
+  for (int stride = maxN / 2; stride > 0; stride /= 2)
+  {
+    #pragma acc parallel loop present(comBuff)
+    for (int i = 0; i < stride; i++)
+    {
+      float4 comi = comBuff[i];
+      float4 comis = comBuff[i + stride];
+      float wSum = comi.w + comis.w;
+
+      if (wSum <= 0.0f) continue;
+
+      float ratio = comis.w / wSum;
+
+      comi.x += (comis.x - comi.x) * ratio;
+      comi.y += (comis.y - comi.y) * ratio;
+      comi.z += (comis.z - comi.z) * ratio;
+      comi.w = wSum;
+
+      comBuff[i] = comi;  
+    }
+  }
+
+  #pragma acc update host(comBuff[0:1])
 
   /********************************************************************************************************************/
 }// end of centerOfMass
