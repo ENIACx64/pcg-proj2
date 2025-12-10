@@ -1,10 +1,10 @@
 /**
  * @file      main.cpp
  *
- * @author    Name Surname \n
+ * @author    Jindrich Vodak \n
  *            Faculty of Information Technology \n
  *            Brno University of Technology \n
- *            xlogin00@fit.vutbr.cz
+ *            xvodak06@stud.fit.vutbr.cz
  *
  * @brief     PCG - Assignment 2 / Step3
  *
@@ -65,13 +65,13 @@ int main(int argc, char **argv)
    *         Data pointer   consecutive elements    element in FLOATS
    *                        in FLOATS (not bytes)   (not bytes)
    */
-  MemDesc md(nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
-             nullptr,       0,                      0,
+  MemDesc md(&particles[0].positions[0].x, 4, 0,
+             &particles[0].positions[0].y, 4, 0,
+             &particles[0].positions[0].z, 4, 0,
+             &particles[0].velocities[0].x, 3, 0,
+             &particles[0].velocities[0].y, 3, 0,
+             &particles[0].velocities[0].z, 3, 0,
+             &particles[0].positions[0].w, 4, 0,
              N,
              recordsCount);
 
@@ -95,15 +95,16 @@ int main(int argc, char **argv)
   /*                   TODO: Allocate memory for center of mass buffer. Remember to clear it.                         */
   /********************************************************************************************************************/
 
-  float4* comBuffer = nullptr;
+  float4* comBuffer = new float4();
+  #pragma acc enter data create(comBuffer[0:1])
 
   /********************************************************************************************************************/
 
   /********************************************************************************************************************/
   /*                                     TODO: Memory transfer CPU -> GPU                                             */
   /********************************************************************************************************************/
-
-
+  particles[0].copyToDevice();
+  particles[1].copyToDevice();
 
   /********************************************************************************************************************/
 
@@ -193,7 +194,6 @@ int main(int argc, char **argv)
   /********************************************************************************************************************/
   /*                                TODO: Free center of mass buffer memory                                           */
   /********************************************************************************************************************/
-
 
 
   /********************************************************************************************************************/
