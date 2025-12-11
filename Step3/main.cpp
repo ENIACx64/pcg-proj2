@@ -16,12 +16,18 @@
 
 #include <chrono>
 #include <cmath>
+#include <csetjmp>
 #include <cstdio>
 #include <string>
 
 #include "nbody.h"
 #include "h5Helper.h"
 #include "Vec.h"
+
+// adding global variables for stream IDs
+#define STREAM_NEW_POS 1
+#define STREAM_COPY_DATA 2
+#define STREAM_CALC_COM 3
 
 /**
  * Main routine
@@ -94,9 +100,12 @@ int main(int argc, char **argv)
   /********************************************************************************************************************/
   /*                   TODO: Allocate memory for center of mass buffer. Remember to clear it.                         */
   /********************************************************************************************************************/
+  // rounding to the closest power of two (for division)
+  unsigned maxN = 1;
+  while (maxN < N) maxN <<= 1;
 
-  float4* comBuffer = new float4();
-  #pragma acc enter data create(comBuffer[0:1])
+  float4* comBuffer = new float4[maxN]();
+  #pragma acc enter data create(comBuffer[0:maxN])
 
   /********************************************************************************************************************/
 
@@ -105,6 +114,7 @@ int main(int argc, char **argv)
   /********************************************************************************************************************/
   particles[0].copyToDevice();
   particles[1].copyToDevice();
+  #pragma acc wait (STREAM_COPY_DATA)
 
   /********************************************************************************************************************/
 
@@ -137,8 +147,23 @@ int main(int argc, char **argv)
     /******************************************************************************************************************/
     /*                                        TODO: GPU computation                                                   */
     /******************************************************************************************************************/
+    calculateVelocity(particles[srcIdx], particles[dstIdx], N, dt);
 
+    if (shouldWrite(s))
+    {
+      #pragma acc wait(STREAM_NEW_POS)
+      centerOfMass(particles[dstIdx], comBuffer, N);
 
+      #pragma acc wait(STREAM_CALC_COM)
+      particles[srcIdx].copyToHost();
+
+      #pragma acc update host(comBuffer[0:1]) async(STREAM_COPY_DATA)
+
+      #pragma acc wait(STREAM_COPY_DATA)
+
+      h5Helper.writeParticleData(getRecordNum(s));
+      h5Helper.writeCom(comBuffer[0], getRecordNum(s));
+    }
 
     /******************************************************************************************************************/
   }
@@ -148,8 +173,9 @@ int main(int argc, char **argv)
   /********************************************************************************************************************/
   /*            TODO: Invocation of center of mass kernel, do not forget to add additional synchronization            */
   /********************************************************************************************************************/
+  #pragma acc wait(STREAM_NEW_POS, STREAM_COPY_DATA, STREAM_CALC_COM)
 
-
+  centerOfMass(particles[resIdx], comBuffer, N);
 
   /********************************************************************************************************************/
 
@@ -163,8 +189,8 @@ int main(int argc, char **argv)
   /********************************************************************************************************************/
   /*                                     TODO: Memory transfer GPU -> CPU                                             */
   /********************************************************************************************************************/
-
-
+  particles[resIdx].copyToHost();
+  #pragma acc wait (STREAM_COPY_DATA)
 
   /********************************************************************************************************************/
 
@@ -194,7 +220,8 @@ int main(int argc, char **argv)
   /********************************************************************************************************************/
   /*                                TODO: Free center of mass buffer memory                                           */
   /********************************************************************************************************************/
-
+  #pragma acc exit data delete(comBuffer[0:maxN])
+  delete[] comBuffer;
 
   /********************************************************************************************************************/
 
