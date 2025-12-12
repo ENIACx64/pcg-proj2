@@ -19,6 +19,7 @@
 #include <csetjmp>
 #include <cstdio>
 #include <string>
+#include <thread>
 
 #include "nbody.h"
 #include "h5Helper.h"
@@ -129,7 +130,7 @@ int main(int argc, char **argv)
   {
     return s / writeFreq;
   };
-  
+
   // Start measurement
   const auto start = std::chrono::steady_clock::now();
 
@@ -155,11 +156,17 @@ int main(int argc, char **argv)
       centerOfMass(particles[dstIdx], comBuffer, N);
 
       #pragma acc wait(STREAM_CALC_COM)
-      particles[srcIdx].copyToHost();
+      particles[dstIdx].copyToHost();
 
       #pragma acc update host(comBuffer[0:1]) async(STREAM_COPY_DATA)
 
       #pragma acc wait(STREAM_COPY_DATA)
+
+      if (dstIdx != 0)
+      {
+        std::copy(particles[dstIdx].positions, particles[dstIdx].positions + N, particles[0].positions);
+        std::copy(particles[dstIdx].velocities, particles[dstIdx].velocities + N, particles[0].velocities);
+      }
 
       h5Helper.writeParticleData(getRecordNum(s));
       h5Helper.writeCom(comBuffer[0], getRecordNum(s));
