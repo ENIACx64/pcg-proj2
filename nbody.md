@@ -68,18 +68,18 @@ Výpočet těžiště zajišťuje jediný kernel centerOfMass().
 Byla naalokována paměť o velikosti nebližší mocniny dvojky vyšší než N, tedy např. pro N=1000 by byla naalokována paměť maxN=1024. To umožnilo snažší implementaci redukce.
 
 **Jaké je zrychelní vůči sekveční verzi? Zdůvodněte.**
-TODO
+Ke zrychlení došlo, ale bylo velmi malé (v rámci desetitisícin sekund). Mezi možné důvody může patřit velikost domény či neoptimální způsob implementace redukčního algoritmu.
 
 ### Krok 3: Synchronizace
 **Popište Vaše řešení synchronizace:**
-TODO
+Implementace synchronizace je principiálně ekvivalentní řešení z prvního projektu. Jsou vytvořeny tři stream ID pro výpočet nové polohy částice, kopírování dat a výpočet těžiště. Tato ID jsou zadefinována v hlavičce v main.cpp i nbody.cpp. Při volání kernelu či metody pro kopírování dat je použit async s ID příslušné operace. Operace jsou synchronizovány pomocí wait. Na konci se zkopírovaná data zapíší do souboru pomocí metod objektu H5Helper.
 
 **Došlo ke zrychlení?**
-TODO
+Ne, ke zrychlení nedošlo.
 
 ### Krok 4: Měření výkonu
 **Jakých jste dosáhli výsledků?**
-TODO
+Výsledky se dají považovat za poměrně dobré, neboť došlo k výraznému zrychlení oproti referenční implementaci. Zároveň došlo i ke zrychlení oproti CUDA verzi, viz minulý projekt.
 
 **Lze v datech pozorovat nějaké anomálie?**
-TODO
+Mimo anomálii popsanou v části věnované Step0 došlo ještě k anomálii u zpomalení v synchronizační úloze. Zpomalení je pravděpodobně dáno tím, že se operace z důvodu různých složitostí daných operací nedokázaly kompletně překrýt a tím pádem dochází k marnění času.
